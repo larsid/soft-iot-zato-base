@@ -121,10 +121,10 @@ class LocalStorageController:
 
     def on_connect(self, client, userdata, flags, rc):
         self.logger.info(f"MQTT Conectado com código: {rc}")
-        # Subscreve nos tópicos necessários
         topics = [
-            ("CONNECTED", 1),
-            ("dev/#", 1) # Captura dev/+/RES, dev/+/FLOW, etc.
+            ("CONNECTED", 1),       # Legado (Java)
+            ("dev/CONNECTIONS", 1), # Novo padrão (Python Device)
+            ("dev/#", 1)            # Dados e Respostas
         ]
         client.subscribe(topics)
         self.logger.info(f"Inscrito nos tópicos: {topics}")
@@ -136,20 +136,86 @@ class LocalStorageController:
         try:
             topic = msg.topic
             payload = msg.payload.decode('utf-8')
-            # self.logger.info(f"Mensagem recebida em {topic}: {payload}")
 
             if tatu_wrapper is None:
                 return
 
-            # Lógica copiada e adaptada do Java
-            if tatu_wrapper.is_tatu_response(payload):
-                self.handle_tatu_response(payload)
+            # 1. Trata solicitação de conexão (Handshake do Python Device)
+            if topic == "dev/CONNECTIONS":
+                self.handle_connect_request(payload)
             
+            # 2. Trata conexão simples (Legado Java)
             elif topic == "CONNECTED":
+                # Payload é apenas o ID string
                 self.handle_device_connected(payload)
+
+            # 3. Trata respostas de dados (RES)
+            elif tatu_wrapper.is_tatu_response(payload):
+                self.handle_tatu_response(payload)
 
         except Exception as e:
             self.logger.error(f"Erro ao processar mensagem MQTT: {e}", exc_info=True)
+
+
+    def handle_connect_request(self, payload):
+        """
+        Processa o CONNECT do Virtual-FoT-Device e envia o CONNACK.
+        """
+        self.logger.info(f"DEBUG PAYLOAD (Len: {len(payload)}): '{payload}'")
+
+        if not payload:
+            self.logger.warning("Payload vazio recebido no CONNECT. Ignorando.")
+            return
+
+        try:
+            # --- CORREÇÃO: Extrair JSON do comando TATU ---
+            # O formato é "CONNECT VALUE BROKER {...}"
+            # Localizamos onde começa o objeto JSON
+            json_start_index = payload.find('{')
+            
+            if json_start_index == -1:
+                self.logger.error("Payload CONNECT inválido: Nenhum objeto JSON encontrado.")
+                return
+                
+            # Cortamos a string para pegar apenas do '{' em diante
+            clean_payload = payload[json_start_index:]
+            data = json.loads(clean_payload)
+            # ---------------------------------------------
+            
+            header = data.get("HEADER", {})
+            device_id = header.get("NAME")
+            
+            if not device_id:
+                self.logger.warning("Recebido CONNECT sem nome do dispositivo.")
+                return
+
+            self.logger.info(f"Recebido CONNECT de {device_id}. Enviando CONNACK...")
+
+            # Monta resposta CONNACK (Autorizando conexão)
+            connack = {
+                "CODE": "POST",
+                "METHOD": "CONNACK",
+                "HEADER": {
+                    "NAME": "Zato-Gateway",
+                    "TIMESTAMP": int(time.time() * 1000)
+                },
+                "BODY": {
+                    "NEW_NAME": device_id,
+                    "CAN_CONNECT": True
+                }
+            }
+            
+            # Publica no tópico de resposta esperado pelo dispositivo
+            resp_topic = "dev/CONNECTIONS/RES"
+            self.client.publish(resp_topic, json.dumps(connack))
+            self.logger.info(f"CONNACK enviado para {resp_topic}")
+            
+            # Inicia o fluxo de dados
+            time.sleep(0.5) 
+            self.handle_device_connected(device_id)
+
+        except Exception as e:
+            self.logger.error(f"Erro ao processar CONNECT: {e}")
 
     def handle_tatu_response(self, message_content):
         """Processa respostas TATU (GET ou FLOW) e salva no banco."""
@@ -255,26 +321,64 @@ class LocalStorageController:
             self.logger.error(f"Erro SQL ao inserir dados: {e}")
 
     def handle_device_connected(self, device_id):
-        """Envia requisição de FLOW quando um dispositivo conecta (lógica do Java)."""
+        """Envia requisição de FLOW quando um dispositivo conecta."""
         self.logger.info(f"Dispositivo conectado detectado: {device_id}")
         
-        # No código Java, ele busca no 'fotDevices' para saber quais sensores o device tem.
-        # Como estamos desacoplados, vamos enviar um comando genérico de INFO ou assumir sensores padrão.
-        # Melhoria: Assumir que o dispositivo deve reportar seus sensores ou enviar um comando INFO.
-        
-        # Enviando comando padrão para coleta de temperatura como exemplo (ou adaptável)
-        # Para ser fiel ao Java: 'sendFlowRequest'
-        
-        # Como não temos o 'Controller fotDevices' (Java) que mapeia o device,
-        # não sabemos quais sensores ele tem.
-        # SOLUÇÃO: Enviar um GET INFO para descobrir (não estava no Java original, mas é necessário aqui)
-        # OU, apenas logar que não é possível enviar FLOW sem o mapeamento.
-        
-        self.logger.warning(f"Device {device_id} conectado. O Mapeamento de dispositivos ainda não foi migrado, então o comando FLOW automático foi ignorado.")
-        
-        # Exemplo de como enviar se soubéssemos o sensor (ex: 'temp'):
-        # flow_req = tatu_wrapper.build_tatu_flow_value_message("temp", DEFAULT_COLLECTION_TIME, DEFAULT_PUBLISHING_TIME)
-        # self.client.publish(f"{tatu_wrapper.TOPIC_BASE}{device_id}", flow_req)
+        try:
+            # --- INTEGRAÇÃO ZATO: Invocando o serviço de Mapping ---
+            # O 'self' aqui é a classe LocalStorageController, não um serviço Zato.
+            # Para invocar um serviço Zato de dentro de uma thread/biblioteca pura, 
+            # a maneira mais limpa é ter passado o objeto 'service' original no start().
+            # Mas como estamos desacoplados, vamos simular que conhecemos a configuração
+            # ou (Melhor) ler o mesmo arquivo JSON se quisermos performance extrema.
+            
+            # Porém, para seguir a arquitetura SOA correta dentro do Zato, 
+            # deveríamos usar self.gateway.invoke() se tivéssemos acesso ao objeto Zato Service.
+            
+            # SOLUÇÃO PRÁTICA:
+            # Vamos ler o arquivo JSON diretamente aqui também por enquanto.
+            # Isso evita complexidade de passar contextos do Zato para a thread do MQTT.
+            # (Em uma versão v2, passaríamos o 'self' do serviço Zato para o controller).
+            
+            # Copie o caminho que definimos no outro arquivo
+            CONFIG_FILE_PATH = '/home/ubuntu/mapping_archives/devices.json'
+            
+            if not os.path.exists(CONFIG_FILE_PATH):
+                self.logger.warning("Arquivo de devices.json não encontrado para configurar o dispositivo.")
+                return
+
+            with open(CONFIG_FILE_PATH, 'r') as f:
+                devices = json.load(f)
+            
+            device_info = next((d for d in devices if d.get('id') == device_id), None)
+            
+            if device_info:
+                self.logger.info(f"Configuração encontrada para {device_id}. Enviando comando FLOW...")
+                sensors = device_info.get('sensors', [])
+                
+                for sensor in sensors:
+                    # Extrai configurações do JSON ou usa defaults
+                    c_time = sensor.get('collection_time', 10) # Default do Java era config
+                    p_time = sensor.get('publishing_time', 30)
+                    sensor_id = sensor.get('id')
+                    
+                    # Constrói a mensagem TATU FLOW
+                    # Ex: FLOW VALUE sensor1 {"collect":1000,"publish":3000,"TIMESTAMP":...}
+                    # Nota: TATU usa milissegundos
+                    flow_req = tatu_wrapper.build_tatu_flow_value_message(
+                        sensor_id, 
+                        int(c_time * 1000), 
+                        int(p_time * 1000)
+                    )
+                    
+                    topic = f"{tatu_wrapper.TOPIC_BASE}{device_id}"
+                    self.logger.info(f"Publicando no tópico {topic}: {flow_req}")
+                    self.client.publish(topic, flow_req)
+            else:
+                self.logger.warning(f"Dispositivo {device_id} não encontrado no mapeamento. Ignorando configuração.")
+
+        except Exception as e:
+            self.logger.error(f"Erro ao tentar configurar dispositivo conectado: {e}")
 
 
 # --- Serviço Zato ---
