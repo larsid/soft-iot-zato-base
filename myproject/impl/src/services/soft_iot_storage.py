@@ -10,6 +10,7 @@ import json
 import time
 import os
 import logging
+import random
 from datetime import datetime
 
 # Third-party
@@ -25,7 +26,7 @@ except ImportError:
     tatu_wrapper = None
 
 # --- Configurações Hardcoded (como solicitado) ---
-BROKER_URL = "172.22.96.236" # Ou o nome do container do broker, ex: "mosquitto"
+BROKER_URL = "127.0.0.1" # Ou o nome do container do broker, ex: "mosquitto"
 BROKER_PORT_TCP = 1883
 BROKER_PORT_WS = 9001
 DB_FILENAME = "/opt/zato/env/soft_iot_data.db" # Caminho persistente dentro do container Zato
@@ -55,6 +56,9 @@ class LocalStorageController:
         self.logger = logger
         self.logger.info("Iniciando Soft-IoT Local Storage Controller...")
         
+        #Inicializa memória temporária para auto-cadastro
+        self.pending_registration = {}
+
         # 1. Inicializar Banco de Dados
         self.init_db()
 
@@ -185,6 +189,13 @@ class LocalStorageController:
             header = data.get("HEADER", {})
             device_id = header.get("NAME")
             
+            #Captura dados da estrutura do dispositivo para auto-cadastro ---
+            device_structure = data.get("DEVICE")
+            if device_id and device_structure:
+                self.logger.info(f"Estrutura do dispositivo {device_id} capturada para possível cadastro.")
+                self.pending_registration[device_id] = device_structure
+
+
             if not device_id:
                 self.logger.warning("Recebido CONNECT sem nome do dispositivo.")
                 return
@@ -295,28 +306,48 @@ class LocalStorageController:
         return data_points
 
     def store_sensor_data(self, device_id, sensor_id, data_list):
-        """Insere dados no SQLite."""
+        """Insere dados no SQLite (com verificação de variável de ambiente)."""
+        
+        # --- NOVO: Verifica se deve salvar ---
+        # Padrão é 'true' se a variável não existir
+        save_enabled = os.getenv('Zato_SAVE_DATA_ENABLED', 'True')
+        if(save_enabled == 'False'):
+            save_enabled = False
+        else:
+            save_enabled = True
+            
+        if not save_enabled:
+            # Apenas loga (opcional, para não poluir muito se for alta frequência)
+            self.logger.info(f"[PERSISTÊNCIA OFF] Ignorando {len(data_list)} registros de {device_id}/{sensor_id}")
+            return
+        
+
         try:
             with sqlite3.connect(DB_FILENAME) as conn:
                 cursor = conn.cursor()
                 sql = '''
-                    INSERT INTO sensor_data (sensor_id, device_id, data_value, start_datetime, end_datetime)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO sensor_data (sensor_id, device_id, data_value, start_datetime, end_datetime, aggregation_status)
+                    VALUES (?, ?, ?, ?, ?, 0)
                 '''
                 # Prepara batch
                 batch = []
                 for item in data_list:
-                    # No modelo Java, start e end parecem ser o mesmo para dados atômicos
+                    # Garante que o timestamp seja string ISO ou int, conforme sua lógica de banco
+                    timestamp = item['timestamp'] 
+                    
                     batch.append((
                         sensor_id, 
                         device_id, 
-                        item['value'], 
-                        item['timestamp'], 
-                        item['timestamp']
+                        str(item['value']), # Convertendo para string por segurança (SQLite é dinâmico)
+                        timestamp, 
+                        timestamp
                     ))
                 
-                cursor.executemany(sql, batch)
-                conn.commit()
+                if batch:
+                    cursor.executemany(sql, batch)
+                    conn.commit()
+                    self.logger.info(f"Salvos {len(batch)} registros para {device_id}/{sensor_id}")
+                    
         except Exception as e:
             self.logger.error(f"Erro SQL ao inserir dados: {e}")
 
@@ -325,60 +356,80 @@ class LocalStorageController:
         self.logger.info(f"Dispositivo conectado detectado: {device_id}")
         
         try:
-            # --- INTEGRAÇÃO ZATO: Invocando o serviço de Mapping ---
-            # O 'self' aqui é a classe LocalStorageController, não um serviço Zato.
-            # Para invocar um serviço Zato de dentro de uma thread/biblioteca pura, 
-            # a maneira mais limpa é ter passado o objeto 'service' original no start().
-            # Mas como estamos desacoplados, vamos simular que conhecemos a configuração
-            # ou (Melhor) ler o mesmo arquivo JSON se quisermos performance extrema.
+            CONFIG_FILE_PATH = '/home/ubuntu/mapping_archives/devices_config/devices.json'
             
-            # Porém, para seguir a arquitetura SOA correta dentro do Zato, 
-            # deveríamos usar self.gateway.invoke() se tivéssemos acesso ao objeto Zato Service.
-            
-            # SOLUÇÃO PRÁTICA:
-            # Vamos ler o arquivo JSON diretamente aqui também por enquanto.
-            # Isso evita complexidade de passar contextos do Zato para a thread do MQTT.
-            # (Em uma versão v2, passaríamos o 'self' do serviço Zato para o controller).
-            
-            # Copie o caminho que definimos no outro arquivo
-            CONFIG_FILE_PATH = '/home/ubuntu/mapping_archives/devices.json'
-            
-            if not os.path.exists(CONFIG_FILE_PATH):
-                self.logger.warning("Arquivo de devices.json não encontrado para configurar o dispositivo.")
-                return
+            # 1. Carregar dispositivos existentes
+            devices = []
+            if os.path.exists(CONFIG_FILE_PATH):
+                 with open(CONFIG_FILE_PATH, 'r') as f:
+                     try:
+                         devices = json.load(f)
+                     except json.JSONDecodeError:
+                         devices = []
 
-            with open(CONFIG_FILE_PATH, 'r') as f:
-                devices = json.load(f)
-            
+            # 2. Buscar dispositivo
             device_info = next((d for d in devices if d.get('id') == device_id), None)
             
+            # --- NOVO: Lógica de Auto-Cadastro ---
+            if not device_info:
+                self.logger.warning(f"Dispositivo {device_id} não encontrado. Verificando possibilidade de auto-cadastro...")
+                
+                # Verifica se temos os dados do CONNECT em memória
+                if device_id in self.pending_registration:
+                    self.logger.info(f"Iniciando Auto-Provisioning para {device_id}...")
+                    
+                    new_device_data = self.pending_registration.pop(device_id)
+                    new_device_data['id'] = device_id # Garante o ID
+                    
+                    # Aplica configurações genéricas (Defaults)
+                    for sensor in new_device_data.get('sensors', []):
+                        sensor['collection_time'] = random.randint(1, DEFAULT_COLLECTION_TIME)
+                        sensor['publishing_time'] = random.randint(1, DEFAULT_PUBLISHING_TIME)
+                    
+                    # Adiciona e Salva
+                    devices.append(new_device_data)
+                    self._save_devices_file(CONFIG_FILE_PATH, devices)
+                    
+                    # Atualiza a variável local para que o fluxo continue
+                    device_info = new_device_data
+                    self.logger.info(f"Dispositivo {device_id} cadastrado e salvo com sucesso!")
+                else:
+                    self.logger.error(f"Sem dados estruturais para auto-cadastrar {device_id}. Ignorando.")
+                    return
+            # -------------------------------------
+
             if device_info:
                 self.logger.info(f"Configuração encontrada para {device_id}. Enviando comando FLOW...")
                 sensors = device_info.get('sensors', [])
                 
                 for sensor in sensors:
-                    # Extrai configurações do JSON ou usa defaults
-                    c_time = sensor.get('collection_time', 10) # Default do Java era config
-                    p_time = sensor.get('publishing_time', 30)
+                    c_time = sensor.get('collection_time', DEFAULT_COLLECTION_TIME)
+                    p_time = sensor.get('publishing_time', DEFAULT_PUBLISHING_TIME)
                     sensor_id = sensor.get('id')
                     
-                    # Constrói a mensagem TATU FLOW
-                    # Ex: FLOW VALUE sensor1 {"collect":1000,"publish":3000,"TIMESTAMP":...}
-                    # Nota: TATU usa milissegundos
                     flow_req = tatu_wrapper.build_tatu_flow_value_message(
                         sensor_id, 
                         int(c_time * 1000), 
                         int(p_time * 1000)
                     )
-                    
+                    time.sleep(5)
                     topic = f"{tatu_wrapper.TOPIC_BASE}{device_id}"
                     self.logger.info(f"Publicando no tópico {topic}: {flow_req}")
                     self.client.publish(topic, flow_req)
-            else:
-                self.logger.warning(f"Dispositivo {device_id} não encontrado no mapeamento. Ignorando configuração.")
 
         except Exception as e:
             self.logger.error(f"Erro ao tentar configurar dispositivo conectado: {e}")
+
+    # --- NOVO: Helper para salvar JSON ---
+    def _save_devices_file(self, filepath, data):
+        """Salva a lista de dispositivos no arquivo JSON."""
+        try:
+            # Garante que o diretório existe
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            self.logger.error(f"Erro ao salvar arquivo de dispositivos: {e}")
 
 
 # --- Serviço Zato ---
