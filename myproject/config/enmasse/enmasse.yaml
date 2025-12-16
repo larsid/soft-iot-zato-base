@@ -2,23 +2,27 @@ security:
 groups:
 
 channel_rest:
-  - name: local_storage_get_history
-    service: soft-iot.api.get-history
-    url_path: /soft-iot/local-storage/get-history
-    data_format: json
-  - name: local_storage_get_last_data
-    service: soft-iot.api.get-last-data
-    url_path: /soft-iot/local-storage/get-last-data
-    data_format: json
   - name: local_storage_aggregation
     service: soft-iot.aggregation.service
     url_path: /soft-iot/local-storage/aggregation
   - name: local_storage_cleanup
     service: soft-iot.cleanup.service
     url_path: /soft-iot/local-storage/cleanup
+  - name: local_storage_get_history
+    service: soft-iot.api.get-history
+    url_path: /soft-iot/local-storage/get-history
+  - name: local_storage_get_last_data
+    service: soft-iot.api.get-last-data
+    url_path: /soft-iot/local-storage/get-last-data
   - name: local_storage_service_start
     service: soft-iot.storage.service
     url_path: /soft-iot/local-storage/start
+  - name: mapping_devices_get_device
+    service: soft-iot.mapping.get-device
+    url_path: /soft-iot/mapping-devices/get-device
+  - name: mapping_devices_list_devices
+    service: soft-iot.mapping.list-devices
+    url_path: /soft-iot/mapping-devices/list-devices
 
 outgoing_rest:
 
