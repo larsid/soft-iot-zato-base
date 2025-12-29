@@ -31,7 +31,7 @@ export container_name=zato-$env_name
 export target=/opt/hot-deploy
 
 # --- ALTERAÇÃO 1: Nome da sua imagem local ---
-export package_address=esb-zato-soft-iot:v4
+export package_address=rhianpablo11/esb-zato-soft-iot:v4
 
 # Absolute path to our source code on host
 # ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
