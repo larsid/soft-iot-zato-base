@@ -26,12 +26,13 @@ except ImportError:
     tatu_wrapper = None
 
 # --- Configurações Hardcoded (como solicitado) ---
-BROKER_URL = "127.0.0.1" # Ou o nome do container do broker, ex: "mosquitto"
+BROKER_URL = "0.0.0.0" # Ou o nome do container do broker, ex: "mosquitto"
 BROKER_PORT_TCP = 1883
 BROKER_PORT_WS = 9001
 DB_FILENAME = "/opt/zato/env/soft_iot_data.db" # Caminho persistente dentro do container Zato
-DEFAULT_COLLECTION_TIME = 10
-DEFAULT_PUBLISHING_TIME = 30
+DEFAULT_COLLECTION_TIME = int(os.getenv('Zato_COLLECTION_TIME', 5))
+DEFAULT_PUBLISHING_TIME = int(os.getenv('Zato_PUBLISH_TIME', 15))
+
 
 # --- Controlador Singleton do MQTT e Banco de Dados ---
 
@@ -354,6 +355,7 @@ class LocalStorageController:
     def handle_device_connected(self, device_id):
         """Envia requisição de FLOW quando um dispositivo conecta."""
         self.logger.info(f"Dispositivo conectado detectado: {device_id}")
+        self.logger.info(f"TEMPOS: {DEFAULT_COLLECTION_TIME} E {DEFAULT_PUBLISHING_TIME}")
         
         try:
             CONFIG_FILE_PATH = '/home/ubuntu/mapping_archives/devices_config/devices.json'
@@ -383,8 +385,8 @@ class LocalStorageController:
                     
                     # Aplica configurações genéricas (Defaults)
                     for sensor in new_device_data.get('sensors', []):
-                        sensor['collection_time'] = random.randint(1, DEFAULT_COLLECTION_TIME)
-                        sensor['publishing_time'] = random.randint(1, DEFAULT_PUBLISHING_TIME)
+                        sensor['collection_time'] = DEFAULT_COLLECTION_TIME
+                        sensor['publishing_time'] = DEFAULT_PUBLISHING_TIME
                     
                     # Adiciona e Salva
                     devices.append(new_device_data)

@@ -31,156 +31,32 @@
     },
     {
         "id": "py_device_01",
-        "latitude": 22.33414276683611,
-        "longitude": 91.36604412589509,
+        "latitude": 57.23538438858077,
+        "longitude": 49.8686991471553,
         "sensors": [
             {
                 "id": "temperatureSensor",
                 "type": "Thermometer",
                 "collection_time": 2,
-                "publishing_time": 19
+                "publishing_time": 6
             },
             {
                 "id": "humiditySensor",
                 "type": "HumiditySensor",
-                "collection_time": 5,
-                "publishing_time": 27
-            },
-            {
-                "id": "pulseOxymeter",
-                "type": "PulseOxymeter",
-                "collection_time": 3,
-                "publishing_time": 9
-            },
-            {
-                "id": "windDirectionSensor",
-                "type": "WindDirectionSensor",
-                "collection_time": 10,
-                "publishing_time": 9
-            }
-        ]
-    },
-    {
-        "id": "py_device_02",
-        "latitude": 89.36331401444573,
-        "longitude": -163.08154292599735,
-        "sensors": [
-            {
-                "id": "temperatureSensor",
-                "type": "Thermometer",
-                "collection_time": 1,
-                "publishing_time": 24
-            },
-            {
-                "id": "humiditySensor",
-                "type": "HumiditySensor",
-                "collection_time": 3,
+                "collection_time": 2,
                 "publishing_time": 6
             },
             {
                 "id": "pulseOxymeter",
                 "type": "PulseOxymeter",
-                "collection_time": 5,
-                "publishing_time": 11
+                "collection_time": 2,
+                "publishing_time": 6
             },
             {
                 "id": "windDirectionSensor",
                 "type": "WindDirectionSensor",
-                "collection_time": 10,
-                "publishing_time": 23
-            }
-        ]
-    },
-    {
-        "id": "py_device_03",
-        "latitude": -31.34776034369849,
-        "longitude": 33.343807499323646,
-        "sensors": [
-            {
-                "id": "temperatureSensor",
-                "type": "Thermometer",
-                "collection_time": 5,
-                "publishing_time": 24
-            },
-            {
-                "id": "humiditySensor",
-                "type": "HumiditySensor",
-                "collection_time": 4,
-                "publishing_time": 13
-            },
-            {
-                "id": "pulseOxymeter",
-                "type": "PulseOxymeter",
-                "collection_time": 3,
-                "publishing_time": 18
-            },
-            {
-                "id": "windDirectionSensor",
-                "type": "WindDirectionSensor",
-                "collection_time": 6,
-                "publishing_time": 22
-            }
-        ]
-    },
-    {
-        "id": "py_device_04",
-        "latitude": 42.84443931247483,
-        "longitude": -1.3144887311730713,
-        "sensors": [
-            {
-                "id": "temperatureSensor",
-                "type": "Thermometer",
-                "collection_time": 10,
-                "publishing_time": 5
-            },
-            {
-                "id": "humiditySensor",
-                "type": "HumiditySensor",
-                "collection_time": 6,
-                "publishing_time": 2
-            },
-            {
-                "id": "pulseOxymeter",
-                "type": "PulseOxymeter",
-                "collection_time": 5,
-                "publishing_time": 28
-            },
-            {
-                "id": "windDirectionSensor",
-                "type": "WindDirectionSensor",
-                "collection_time": 10,
-                "publishing_time": 26
-            }
-        ]
-    },
-    {
-        "id": "py_device_10",
-        "latitude": -35.93889502935949,
-        "longitude": -131.66496003382673,
-        "sensors": [
-            {
-                "id": "temperatureSensor",
-                "type": "Thermometer",
-                "collection_time": 6,
-                "publishing_time": 8
-            },
-            {
-                "id": "humiditySensor",
-                "type": "HumiditySensor",
-                "collection_time": 4,
-                "publishing_time": 9
-            },
-            {
-                "id": "pulseOxymeter",
-                "type": "PulseOxymeter",
-                "collection_time": 4,
-                "publishing_time": 19
-            },
-            {
-                "id": "windDirectionSensor",
-                "type": "WindDirectionSensor",
-                "collection_time": 9,
-                "publishing_time": 10
+                "collection_time": 2,
+                "publishing_time": 6
             }
         ]
     }

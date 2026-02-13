@@ -21,6 +21,10 @@ export zato_password=123456
 #precisa no env passar como q eh Zato_nome do env
 export SAVE_DATA_ENABLED=True
 
+# set dos tempos de coleta e publicação para os novos dispositivos ainda nao configurados
+export COLLECTION_TIME=2
+export PUBLISH_TIME=6
+
 # How much of the logging details to show, e.g. "-v" or "-vvvvv"
 export zato_build_verbosity=${Zato_Build_Verbosity:-""}
 
@@ -31,7 +35,8 @@ export container_name=zato-$env_name
 export target=/opt/hot-deploy
 
 # --- ALTERAÇÃO 1: Nome da sua imagem local ---
-export package_address=rhianpablo11/esb-zato-soft-iot:v4
+#export package_address=rhianpablo11/esb-zato-soft-iot:v4
+export package_address=zato-teste-local
 
 # Absolute path to our source code on host
 # ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
@@ -83,6 +88,8 @@ docker run                                                \
     -e ZATO_SSH_PASSWORD=$zato_password                   \
     -e Zato_IDE_Password=$zato_password                   \
     -e Zato_Log_Env_Details=true                          \
+    -e Zato_COLLECTION_TIME=$COLLECTION_TIME              \
+    -e Zato_PUBLISH_TIME=$PUBLISH_TIME                    \
     -e Zato_Build_Verbosity="$zato_build_verbosity"       \
     -e Zato_SAVE_DATA_ENABLED=$SAVE_DATA_ENABLED               \
     --mount type=bind,source=$zato_project_root,target=$target/$env_name,readonly \
