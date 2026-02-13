@@ -59,5 +59,36 @@
                 "publishing_time": 6
             }
         ]
+    },
+    {
+        "id": "py_device_10",
+        "latitude": 27.231499441578194,
+        "longitude": -124.23421880519805,
+        "sensors": [
+            {
+                "id": "temperatureSensor",
+                "type": "Thermometer",
+                "collection_time": 2,
+                "publishing_time": 6
+            },
+            {
+                "id": "humiditySensor",
+                "type": "HumiditySensor",
+                "collection_time": 2,
+                "publishing_time": 6
+            },
+            {
+                "id": "pulseOxymeter",
+                "type": "PulseOxymeter",
+                "collection_time": 2,
+                "publishing_time": 6
+            },
+            {
+                "id": "windDirectionSensor",
+                "type": "WindDirectionSensor",
+                "collection_time": 2,
+                "publishing_time": 6
+            }
+        ]
     }
 ]

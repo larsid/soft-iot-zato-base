@@ -34,9 +34,9 @@ export container_name=zato-$env_name
 # Absolute path to where to install code in the container
 export target=/opt/hot-deploy
 
-# --- ALTERAÇÃO 1: Nome da sua imagem local ---
-#export package_address=rhianpablo11/esb-zato-soft-iot:v4
-export package_address=zato-teste-local
+# --- Nome da sua imagem ---
+export package_address=rhianpablo11/esb-zato-soft-iot:v5
+# export package_address=zato-teste-local
 
 # Absolute path to our source code on host
 # ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
