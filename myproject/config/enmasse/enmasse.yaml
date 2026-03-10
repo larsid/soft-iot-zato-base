@@ -8,9 +8,15 @@ channel_rest:
   - name: local_storage_cleanup
     service: soft-iot.cleanup.service
     url_path: /soft-iot/local-storage/cleanup
+  - name: local_storage_get_aggregated_data
+    service: soft-iot.api.get-sensor-aggregated-data
+    url_path: /soft-iot/local-storage/get-aggregated-data
   - name: local_storage_get_history
     service: soft-iot.api.get-history
     url_path: /soft-iot/local-storage/get-history
+  - name: local_storage_get_last_aggregated_data
+    service: soft-iot.api.get-sensor-last-aggregated-data
+    url_path: /soft-iot/local-storage/get-last-aggregated-data
   - name: local_storage_get_last_data
     service: soft-iot.api.get-last-data
     url_path: /soft-iot/local-storage/get-last-data
