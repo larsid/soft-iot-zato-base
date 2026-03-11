@@ -71,7 +71,7 @@ class GetSensorHistory(BaseAPIService):
     name = 'soft-iot.api.get-history'
 
     def handle(self):
-        self.logger.info(self.request.payload)
+        
         device_id = self.request.payload.get('device_id')
         sensor_id = self.request.payload.get('sensor_id')
         start_date = self.request.payload.get('start_date') # Esperado formato ISO ou timestamp
@@ -165,7 +165,7 @@ class GetSensorAggregatedData(BaseAPIService):
         sensor_id = self.request.payload.get('sensor_id')
 
         if not device_id or not sensor_id:
-            self.respose.payload = {'error': 'device_id and sensor_id are required'}
+            self.response.payload = {'error': 'device_id and sensor_id are required'}
             self.response.status_code = 400
             return
         
