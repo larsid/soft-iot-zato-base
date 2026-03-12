@@ -35,7 +35,7 @@ export container_name=zato-$env_name
 export target=/opt/hot-deploy
 
 # --- Nome da sua imagem ---
-export package_address=rhianpablo11/esb-zato-soft-iot:v5
+export package_address=rhianpablo11/esb-zato-soft-iot:v6
 # export package_address=zato-teste-local
 
 # Absolute path to our source code on host
