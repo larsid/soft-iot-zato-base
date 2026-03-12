@@ -38,6 +38,10 @@ channel_rest:
     service: soft-iot.mapping.list-devices
     url_path: /soft-iot/mapping-devices/list-devices
     data_format: json
+  - name: kmeans_credibility_service
+    service: soft-iot.kmeans.credibility
+    url_path: /soft-iot/kmeans/credibility
+    data_format: json
 
 outgoing_rest:
 
