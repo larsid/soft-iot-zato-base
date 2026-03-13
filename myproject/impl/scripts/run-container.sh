@@ -25,6 +25,14 @@ export SAVE_DATA_ENABLED=True
 export COLLECTION_TIME=2
 export PUBLISH_TIME=6
 
+# indica o tamanho do bloco temporal que será utilizado para realizar a agregação dos dados
+export AGGREGATION_WINDOW_MINUTES=10
+
+# indica o tempo de retenção dos dados que estão no banco de dados
+# o tempo tem que ser maior do que o tempo de agregação dos dados
+# os dados que passam desse tempo de retenção são apagados
+export DATA_RETENTION_SECONDS=1200
+
 # How much of the logging details to show, e.g. "-v" or "-vvvvv"
 export zato_build_verbosity=${Zato_Build_Verbosity:-""}
 
@@ -35,8 +43,8 @@ export container_name=zato-$env_name
 export target=/opt/hot-deploy
 
 # --- Nome da sua imagem ---
-export package_address=rhianpablo11/esb-zato-soft-iot:v6
-# export package_address=zato-teste-local
+# export package_address=rhianpablo11/esb-zato-soft-iot:v6
+export package_address=zato-image-base-test-v7
 
 # Absolute path to our source code on host
 # ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
@@ -72,26 +80,28 @@ echo Starting container $container_name
 docker rm --force $container_name || true &&
 
 # --- ALTERAÇÃO 2: Removido o '--pull=always' ---
-docker run                                                \
-    --name $container_name                                \
-    --restart unless-stopped                              \
-    -p 22022:22                                           \
-    -p 8183:8183                                          \
-    -p 8184:8184                                          \
-    -p 11223:11223                                        \
-    -p 11225:11225                                        \
-    -p 33033:3000                                         \
-    -p 35672:15672                                        \
-    -p 1883:1883                                          \
-    -p 9001:9001                                          \
-    -e Zato_Dashboard_Password=$zato_password             \
-    -e ZATO_SSH_PASSWORD=$zato_password                   \
-    -e Zato_IDE_Password=$zato_password                   \
-    -e Zato_Log_Env_Details=true                          \
-    -e Zato_COLLECTION_TIME=$COLLECTION_TIME              \
-    -e Zato_PUBLISH_TIME=$PUBLISH_TIME                    \
-    -e Zato_Build_Verbosity="$zato_build_verbosity"       \
-    -e Zato_SAVE_DATA_ENABLED=$SAVE_DATA_ENABLED               \
+docker run                                                         \
+    --name $container_name                                         \
+    --restart unless-stopped                                       \
+    -p 22022:22                                                    \
+    -p 8183:8183                                                   \
+    -p 8184:8184                                                   \
+    -p 11223:11223                                                 \
+    -p 11225:11225                                                 \
+    -p 33033:3000                                                  \
+    -p 35672:15672                                                 \
+    -p 1883:1883                                                   \
+    -p 9001:9001                                                   \
+    -e Zato_Dashboard_Password=$zato_password                      \
+    -e ZATO_SSH_PASSWORD=$zato_password                            \
+    -e Zato_IDE_Password=$zato_password                            \
+    -e Zato_Log_Env_Details=true                                   \
+    -e Zato_COLLECTION_TIME=$COLLECTION_TIME                       \
+    -e Zato_PUBLISH_TIME=$PUBLISH_TIME                             \
+    -e Zato_AGGREGATION_WINDOW_MINUTES=$AGGREGATION_WINDOW_MINUTES \
+    -e Zato_Build_Verbosity="$zato_build_verbosity"                \
+    -e Zato_SAVE_DATA_ENABLED=$SAVE_DATA_ENABLED                   \
+    -e Zato_DATA_RETENTION_SECONDS=$DATA_RETENTION_SECONDS         \
     --mount type=bind,source=$zato_project_root,target=$target/$env_name,readonly \
     --mount type=bind,source=$enmasse_file_full_path,target=$target/enmasse/enmasse.yaml,readonly \
     --mount type=bind,source=$host_root_dir/config/auto-generated/env.ini,target=$target/enmasse/env.ini,readonly \
