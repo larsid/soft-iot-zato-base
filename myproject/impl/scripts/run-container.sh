@@ -102,6 +102,7 @@ docker run                                                         \
     -e Zato_Build_Verbosity="$zato_build_verbosity"                \
     -e Zato_SAVE_DATA_ENABLED=$SAVE_DATA_ENABLED                   \
     -e Zato_DATA_RETENTION_SECONDS=$DATA_RETENTION_SECONDS         \
+    -e Zato_GATEWAY_REAL_IP="127.0.0.1"                            \
     --mount type=bind,source=$zato_project_root,target=$target/$env_name,readonly \
     --mount type=bind,source=$enmasse_file_full_path,target=$target/enmasse/enmasse.yaml,readonly \
     --mount type=bind,source=$host_root_dir/config/auto-generated/env.ini,target=$target/enmasse/env.ini,readonly \
