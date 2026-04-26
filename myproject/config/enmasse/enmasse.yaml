@@ -42,6 +42,10 @@ channel_rest:
     service: soft-iot.kmeans.credibility
     url_path: /soft-iot/kmeans/credibility
     data_format: json
+  - name: id_manager
+    service: soft-iot.id.manager
+    url_path: /soft-iot/id-manager
+    data_format: json
 
 outgoing_rest:
 
