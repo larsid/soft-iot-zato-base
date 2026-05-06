@@ -8,6 +8,8 @@
 set -e
 # Uncomment for debugging - shows each command as it's executed
 # set -x 
+# Uncomment for debugging - shows each command as it's executed
+# set -x 
 set -o pipefail
 shopt -s compat31
 
