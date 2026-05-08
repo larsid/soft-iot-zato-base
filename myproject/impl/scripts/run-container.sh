@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ========================================================================
+# ================= SETUP SCRIPT BASH CONFIGS ============================
+# ========================================================================
+
 # Common options
 set -e
 # Uncomment for debugging - shows each command as it's executed
@@ -11,6 +15,11 @@ shopt -s compat31
 CURDIR="${BASH_SOURCE[0]}";RL="readlink";([[ `uname -s`=='Darwin' ]] || RL="$RL -f")
 while([ -h "${CURDIR}" ]) do CURDIR=`$RL "${CURDIR}"`; done
 N="/dev/null";pushd .>$N;cd `dirname ${CURDIR}`>$N;CURDIR=`pwd`;popd>$N
+
+
+# ========================================================================
+# ========================= SETUP OF PORTS OFFSETS  ======================
+# ========================================================================
 
 # get the number parameter (ex: ./run-container.sh 1), uses like ID of container.
 # if no parameter is passed, use 1 as default
@@ -39,7 +48,7 @@ HOST_SSH_PORT=$((22020 + NODE_ID))
 container_name="zato-node-$NODE_ID"
 
 # ========================================================================
-# =============== ENVIRONMENT VARIABLES AND CONFIGS ======================
+# ======== ENVIRONMENT VARIABLES AND CONFIGS INTERNAL OF ZATO ============
 # ========================================================================
 
 # What environment this is
@@ -47,6 +56,42 @@ export env_name=myproject
 
 # What password to use when logging in to the dashboard
 export zato_password=123456
+
+# How much of the logging details to show, e.g. "-v" or "-vvvvv"
+export zato_build_verbosity=${Zato_Build_Verbosity:-"vvvvv"}
+
+# Absolute path to where to install code in the container
+export target=/opt/hot-deploy
+
+# IMPORTANT -> THIS INDICATES THE ADDRESS OF THE DOCKER IMAGE TO USE FOR THE CONTAINER.
+# name of the docker image to use for the container
+export package_address=rhianpablo11/esb-zato-soft-iot:v8
+# export package_address=esb-zato-soft-iot-teste-att 
+
+# Absolute path to our source code on host
+# ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
+# e que seus arquivos de config estão duas pastas acima.
+export host_root_dir=`readlink -f $CURDIR/../../`
+
+# Directory on host pointing to the git clone with our project
+export zato_project_root=$host_root_dir
+
+# Our enmasse file to use
+export enmasse_file=enmasse.yaml
+export enmasse_file_full_path=$host_root_dir/config/enmasse/$enmasse_file
+
+# Directory for auto-generated environment variables
+mkdir -p $host_root_dir/config/auto-generated
+
+# Populate environment variables for the server
+echo '[env]'                               > $host_root_dir/config/auto-generated/env.ini
+echo My_API_Password_1=$My_API_Password_1 >> $host_root_dir/config/auto-generated/env.ini
+echo My_API_Password_2=$My_API_Password_2 >> $host_root_dir/config/auto-generated/env.ini
+echo Zato_Project_Root=$target/$env_name  >> $host_root_dir/config/auto-generated/env.ini
+
+# ========================================================================
+# ============= ENVIRONMENT VARIABLES AND CONFIGS OF PROJECT =============
+# ========================================================================
 
 #variable to enable or disable the saving of data in the database
 #precisa no env passar como q eh Zato_nome do env
@@ -66,45 +111,19 @@ export DATA_RETENTION_SECONDS=1200
 
 export GATEWAY_REAL_IP=10.0.0.14
 
-# How much of the logging details to show, e.g. "-v" or "-vvvvv"
-export zato_build_verbosity=${Zato_Build_Verbosity:-""}
-
-# Absolute path to where to install code in the container
-export target=/opt/hot-deploy
-
-# name of the docker image to use for the container
-export package_address=rhianpablo11/esb-zato-soft-iot:v8
-# export package_address=zato-image-base-test-v7
-
-# Absolute path to our source code on host
-# ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
-# e que seus arquivos de config estão duas pastas acima.
-export host_root_dir=`readlink -f $CURDIR/../../`
-
-# Directory on host pointing to the git clone with our project
-export zato_project_root=$host_root_dir
-
-# Our enmasse file to use
-export enmasse_file=enmasse.yaml
-export enmasse_file_full_path=$host_root_dir/config/enmasse/$enmasse_file
-
 # Directory on host with data archives to be sent to the container
 export host_data_dir_archives_to_send='../../impl/src/archives/'
 export container_data_dir=/home/ubuntu/mapping_archives/devices_config/
 
 # ========================================================================
-# ============= END ENVIRONMENT VARIABLES AND CONFIGS ====================
+# ========= END ENVIRONMENT VARIABLES AND CONFIGS OF PROJECT =============
 # ========================================================================
 
 
-# Directory for auto-generated environment variables
-mkdir -p $host_root_dir/config/auto-generated
 
-# Populate environment variables for the server
-echo '[env]'                               > $host_root_dir/config/auto-generated/env.ini
-echo My_API_Password_1=$My_API_Password_1 >> $host_root_dir/config/auto-generated/env.ini
-echo My_API_Password_2=$My_API_Password_2 >> $host_root_dir/config/auto-generated/env.ini
-echo Zato_Project_Root=$target/$env_name  >> $host_root_dir/config/auto-generated/env.ini
+# ========================================================================
+# ========================= STARTING THE CONTAINER =======================
+# ========================================================================
 
 # Log what we're about to do
 echo Starting container $container_name
@@ -142,7 +161,12 @@ docker run -d \
     -e Zato_DATA_RETENTION_SECONDS=$DATA_RETENTION_SECONDS         \
     $package_address
 
+
 echo "Criando snapshot dos arquivos locais para dentro do container isolado..."
+
+# ====================================================================
+# =============== COPYING FILES TO INSIDE CONTAINER ==================
+# ====================================================================
 
 # grantse that the base folders exist inside the newly created container
 docker exec $container_name mkdir -p $target/$env_name $target/enmasse $target/python-reqs $container_data_dir
@@ -155,6 +179,11 @@ docker cp $host_root_dir/config/python-reqs/requirements.txt $container_name:$ta
 docker cp $host_data_dir_archives_to_send/. $container_name:$container_data_dir/
 
 echo "Container $container_name configurado com sucesso e 100% isolado!"
+
+
+# ========================================================================
+# ========================= SHOWING CONTAINER INFO =======================
+# ========================================================================
 
 echo "----------------------------------------------------------------------"
 printf "| %-32s | %-31s |\n" "Container Info" "Value"
