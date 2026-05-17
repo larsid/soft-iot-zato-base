@@ -21,7 +21,8 @@ class CleanupOldData(Service):
         # 1. Configuração da Retenção (Agora em Segundos)
         try:
             # Procura pela variável DATA_RETENTION_SECONDS
-            retention_seconds = int(os.environ.get('DATA_RETENTION_SECONDS', DEFAULT_RETENTION_SECONDS))
+            retention_seconds = int(os.environ.get('Zato_DATA_RETENTION_SECONDS', DEFAULT_RETENTION_SECONDS))
+            self.logger.info(f'TEMPO LIDO PELA VARIAVEL DE AMBIENTE NO CLEANUP: {os.environ.get('Zato_DATA_RETENTION_SECONDS')}')
         except ValueError:
             retention_seconds = DEFAULT_RETENTION_SECONDS
 

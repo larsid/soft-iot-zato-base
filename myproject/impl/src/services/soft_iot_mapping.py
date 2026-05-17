@@ -6,8 +6,7 @@ from zato.server.service import Service
 
 # Caminho para o arquivo de configuração.
 # O Zato roda a partir da pasta do servidor, então podemos usar caminho relativo ou absoluto.
-# Ajuste este caminho se você decidir colocar o JSON em outro lugar (ex: /opt/zato/env/config/)
-CONFIG_FILE_PATH = '/home/ubuntu/mapping_archives/devices.json'
+CONFIG_FILE_PATH = '/home/ubuntu/mapping_archives/devices_config/devices.json'
 
 class BaseMappingService(Service):
     """ Classe base com utilitários para ler o arquivo de dispositivos. """

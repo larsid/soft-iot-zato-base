@@ -1,132 +1,120 @@
+# Soft-IoT Local Storage (Python Version)
 
+Este projeto consiste na portabilidade e evolução do sistema **Soft-IoT Local Storage** e **Soft-IoT Mapping Devices** da linguagem Java para **Python**. A solução foi reestruturada utilizando a arquitetura **Zato Project Blueprint**, visando uma implantação moderna baseada em microsserviços e práticas de DevOps.
 
+O projeto atua como um **Gateway e Armazenamento Local** para dispositivos IoT, orquestrando a comunicação via protocolo TATU, gerenciando um Broker MQTT interno e expondo APIs de serviço via Zato ESB.
 
-# Soft-IoT Zato ESB Migration
+## 📂 Estrutura do Projeto
 
-Este projeto é uma migração moderna dos módulos `local-storage` e `mapping-devices` da plataforma Soft-IoT (originalmente em Java/OSGi) para Python, rodando sobre o **Zato ESB**.
+O projeto segue a estrutura de diretórios do [Zato Blueprint](https://zato.io/en/tutorials/devops/deployment.html), separando configurações, dependências e implementação:
 
-O sistema atua como um Gateway IoT que gerencia dispositivos via protocolo **TATU (Extended)**, armazena dados em banco local e fornece APIs de consulta.
+```text
+myproject/
+├── config/
+│   ├── enmasse/          # Definições de canais, segurança e conexões (YAML)
+│   ├── python-reqs/      # Dependências Python (pip)
+│   └── user-conf/        # Configurações .ini do Zato
+└── impl/
+    ├── scripts/          # Scripts de provisionamento (run-container.sh)
+    └── src/
+        └── services/          # Serviços Zato (Lógica de negócio em Python)
+        └── archives/          # Arquivos de configuração dos dispositivos IoT
+```
 
----
+-----
 
-## 🏗️ Arquitetura
+## 🚀 Componentes e Módulos
 
-* **Plataforma:** Zato ESB (Python) em Docker.
-* **Protocolo IoT:** MQTT + TATU (Extended Wrapper).
-* **Banco de Dados:** SQLite (Local).
-* **Broker:** Mosquitto ou RabbitMQ (Externo).
+O funcionamento do sistema depende de uma **Imagem Docker Personalizada** que integra múltiplos serviços em um único container. Abaixo estão os principais módulos que compõem a solução:
 
-### Fluxo de Dados
-1.  **Dispositivo** conecta via MQTT.
-2.  **Zato** autoriza (`CONNACK`) e envia configuração (`FLOW`).
-3.  **Dispositivo** publica dados de sensores.
-4.  **Zato** intercepta, processa e salva no **SQLite**.
-5.  **Scheduler** roda tarefas de Agregação e Limpeza periodicamente.
-6.  **Usuário/Dashboard** consulta dados via **API REST**.
+### 1\. Imagem Personalizada do Zato (`esb-zato-soft-iot`)
 
----
+Diferente de uma instalação padrão, este projeto utiliza uma imagem Docker customizada (`esb-zato-soft-iot`) que adiciona funcionalidades críticas para o ambiente IoT:
 
-## 🚀 Instalação e Deploy
+  * **Broker MQTT (Mosquitto):** Integrado diretamente no container. O Zato e os dispositivos comunicam-se localmente ou externamente através das portas `1883` (TCP) e `9001` (WebSockets).
+  * **Extended TATU Wrapper:** A biblioteca Python (`extended-tatu-wrapper`) é instalada nativamente na imagem, permitindo que os serviços do Zato compreendam e construam mensagens do protocolo TATU (FLOW, GET, CONNECT).
+  * **Orquestração de Inicialização (`start_wrapper.sh`):** Um script bash que garante a ordem correta de subida dos serviços:
+    1.  Inicia o Mosquitto em background.
+    2.  Aguarda a liberação das portas.
+    3.  Inicia o Scheduler Externo.
+    4.  Transfere o controle para o processo principal do Zato.
+
+### 2\. Scheduler Customizado (`custom_scheduler.py`)
+
+Um agendador externo desenvolvido em Python que roda paralelamente ao Zato.
+
+  * **Função:** Ler o arquivo de configuração `enmasse.yaml` e disparar requisições HTTP para os serviços do Zato (Jobs) conforme configurado.
+  * **Diferencial:** Possui uma lógica de `wait_for_zato`, garantindo que os jobs só comecem a ser disparados quando a API do Zato estiver respondendo ao `/ping` (status 200).
+
+### 3\. Protocolo TATU (Python)
+
+A lógica de comunicação IoT foi migrada do Java para Python, utilizando o repositório `extended-tatu-wrapper`. Isso permite que o Local Storage interprete payloads JSON complexos enviados pelos dispositivos virtuais (Virtual FoT Device).
+
+-----
+
+## 🛠️ Como Executar
+
+O projeto é totalmente containerizado. Para iniciar o ambiente:
 
 ### Pré-requisitos
-* Docker e Docker Compose.
-* Acesso ao container do Zato (usuário `zato`).
 
-### 1. Estrutura de Arquivos
-No diretório `pickup` do servidor Zato (`/opt/zato/env/qs-1/server1/pickup/`), você deve ter:
+  * Docker instalado e rodando.
+  * Portas `1883`, `8183`, `8184`, `11225`, `33033`, `35672`, `9001`, `11223`, `22022`,  livres no host.
 
-* `soft_iot_storage.py` - O "Worker" MQTT principal.
-* `soft_iot_mapping.py` - Serviços de gestão de dispositivos.
-* `soft_iot_api.py` - API REST para consulta de dados.
-* `soft_iot_aggregation.py` - Serviço de agregação de dados (médias).
-* `soft_iot_cleanup.py` - Serviço de limpeza de dados antigos.
-* `devices.json` - Arquivo de configuração dos dispositivos.
+### Passo a Passo
 
-### 2. Configuração (`devices.json`)
-Defina os dispositivos permitidos e seus sensores:
+1.  **Navegue até o script de execução:**
 
-```json
-[
-    {
-        "id": "py_device_01",
-        "sensors": [
-            {
-                "id": "temperatureSensor",
-                "type": "Thermometer",
-                "collection_time": 4,
-                "publishing_time": 8
-            }
-        ]
-    }
-]
-```
+    ```bash
+    cd myproject/impl/scripts
+    ```
 
-### 3\. Configuração do Código (`soft_iot_storage.py`)
+2.  **Execute o container:**
+    O script `run-container.sh` foi configurado para montar os volumes de código (`src/`) e configuração (`enmasse.yaml`) automaticamente.
 
-Edite a variável `BROKER_URL` para apontar para o seu broker MQTT:
+    ```bash
+    ./run-container.sh
+    ```
 
-```python
-BROKER_URL = "172.x.x.x" # IP do Broker acessível pelo container Zato
-```
+    *Este comando irá parar qualquer container anterior com o mesmo nome, fazer o pull da imagem base (se necessário) e iniciar o ambiente.*
 
------
 
-## 🛠️ Serviços Disponíveis
-
-### 📡 Core (MQTT)
-
-  * **`soft-iot.storage.service`**
-      * *Função:* Inicia a thread de conexão MQTT. Deve ser executado **uma vez** na inicialização (via Scheduler "On Startup" ou Invoker manual).
-      * *Logs:* `server.log` mostrará "MQTT Conectado".
-
-### 💾 Manutenção (Scheduler)
-
-  * **`soft-iot.aggregation.service`**
-      * *Função:* Calcula médias horárias dos dados brutos.
-      * *Agendamento Sugerido:* A cada 1 hora.
-  * **`soft-iot.cleanup.service`**
-      * *Função:* Remove dados brutos antigos para economizar espaço.
-      * *Config:* Variável de ambiente `DATA_RETENTION_SECONDS` (Padrão: 60s para dev, 86400 para prod).
-      * *Agendamento Sugerido:* A cada 24 horas.
-
-### 🔌 API (REST/Invoker)
-
-  * **`soft-iot.mapping.list-devices`**
-      * Retorna a lista de dispositivos cadastrados.
-  * **`soft-iot.mapping.get-device`**
-      * Payload: `{"device_id": "..."}`. Retorna detalhes de um dispositivo.
-  * **`soft-iot.api.get-last-data`**
-      * Payload: `{"device_id": "...", "sensor_id": "..."}`. Retorna a leitura mais recente.
-  * **`soft-iot.api.get-history`**
-      * Payload: `{"device_id": "...", "sensor_id": "...", "limit": 100, "aggregation_status": 0}`.
-      * `aggregation_status`: 0 = Dados Brutos, 1 = Dados Agregados (Médias).
-
------
-
-## ✅ Funcionalidades Convertidas (De/Para)
-
-| Funcionalidade Original (Java) | Status Zato (Python) | Observação |
-| :--- | :--- | :--- |
-| **Leitura de Config (.cfg)** | ✅ **devices.json** | Mais flexível e legível. |
-| **Conexão MQTT** | ✅ **Paho Python** | Executa em background thread. |
-| **Handshake TATU** | ✅ **Implementado** | Suporte a `CONNECT`, `CONNACK` e `FLOW`. |
-| **Persistência (H2)** | ✅ **SQLite** | Arquivo `.db` persistente. |
-| **Agregação de Dados** | ✅ **Aggregation Service** | Consolida dados históricos. |
-| **Limpeza Automática** | ✅ **Cleanup Service** | Política de retenção configurável. |
-| **API Java (OSGi)** | ✅ **API REST Zato** | Acessível via HTTP/JSON. |
-| **Enriquecimento Semântico** | ❌ **Não Migrado** | Requer libs RDF (fora do escopo atual). |
+    *Você deve ver mensagens como `[WRAPPER] Iniciando Mosquitto Broker...` e `Zato está ONLINE! Iniciando agendamento...`.*
 
 -----
 
 ## 🧪 Como Testar
 
-1.  Suba o Zato e o Broker MQTT.
-2.  Inicie o serviço `soft-iot.storage.service` via Dashboard.
-3.  Rode um dispositivo virtual (ex: Virtual-FoT-Device).
-4.  Verifique se o Zato enviou o comando `FLOW` nos logs.
-5.  Aguarde a chegada de dados.
-6.  Consulte via API: `soft-iot.api.get-last-data`.
+Após a inicialização, você pode testar o sistema com um dispositivo virtual:
+
+
+### 1\. Integração com Dispositivos
+
+Para testar o fluxo completo, execute a versão Python do **Virtual FoT Device** (presente no repositório [`virtual-fot-device:python_version`](https://github.com/larsid/virtual-fot-device/tree/python_version)).
+
+1.  Configure o dispositivo para apontar para o IP da sua máquina (onde o container Zato está rodando).
+2.  O dispositivo enviará um `CONNECT` para o tópico `dev/CONNECTIONS`.
+3.  O Local Storage (Zato) deve processar e responder o dispositivo.
+4.  Caso o dispositivo tenha uma configuração pre-existente ela será aplicada para o controle do dispositivo, caso contrário será cadastrado o dispositivo e aplicada uma configuração aleatoria dentre os padrões pre-existentes.
 
 -----
 
-**Desenvolvido com Zato ESB 🚀**
+## 📚 Repositórios Base e Referências
+
+Este projeto é o resultado da integração e conversão dos seguintes repositórios:
+
+1.  **[Virtual FoT Device (Java/Python)](https://www.google.com/search?q=https://github.com/larsid/virtual-fot-device):**
+      * Origem dos dispositivos simulados. A versão Python deste dispositivo é utilizada para enviar dados a este Local Storage.
+2.  **[Extended TATU Wrapper](https://www.google.com/search?q=https://github.com/larsid/extended-tatu-wrapper):**
+      * Biblioteca fundamental portada para Python que permite a serialização/deserialização das mensagens IoT.
+3.  **[Zato Project Blueprint](https://github.com/zatosource/zato-project-blueprint):**
+      * Base arquitetural utilizada para organizar este repositório, facilitando a gestão de configuração (Enmasse) e deploy via Docker.
+4.  **[Zato ESB Services (Imagem Customizada)](https://hub.docker.com/r/rhianpablo11/esb-zato-soft-iot):**
+      * Contém os scripts `Dockerfile`, `start_wrapper.sh` e `custom_scheduler.py` que permitem rodar o Zato junto com o Mosquitto.
+
+-----
+
+## 📝 Notas de Desenvolvimento
+
+  * **Migração Java -\> Python:** A lógica de persistência e tratamento de mensagens que residia em classes Java (Controllers/Models) agora deve ser implementada como **Serviços Zato** dentro de `impl/src/services/`.
+  * **Enmasse:** Toda a configuração de canais REST, segurança e agendamentos deve ser feita no arquivo `config/enmasse/enmasse.yaml`, que é carregado automaticamente no boot.
