@@ -60,15 +60,15 @@ export env_name=myproject
 export zato_password=123456
 
 # How much of the logging details to show, e.g. "-v" or "-vvvvv"
-export zato_build_verbosity=${Zato_Build_Verbosity:-"vvvvv"}
+export zato_build_verbosity=${Zato_Build_Verbosity:-"v"}
 
 # Absolute path to where to install code in the container
 export target=/opt/hot-deploy
 
 # IMPORTANT -> THIS INDICATES THE ADDRESS OF THE DOCKER IMAGE TO USE FOR THE CONTAINER.
 # name of the docker image to use for the container
-export package_address=rhianpablo11/esb-zato-soft-iot:v8
-# export package_address=esb-zato-soft-iot-teste-att 
+# export package_address=rhianpablo11/esb-zato-soft-iot:v8
+export package_address=zato-docker-image-new
 
 # Absolute path to our source code on host
 # ATENÇÃO: Esse script assume que ele está dentro de uma pasta 'bin' ou similar
